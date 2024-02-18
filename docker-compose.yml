@@ -1,0 +1,89 @@
+version: '3'
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    volumes:
+      - ./domains/medical-tracker-backend/src/:/var/www
+      - ./etc/proxy/conf.d:/etc/nginx/conf.d
+    ports:
+      - "8876:80"
+    depends_on:
+      - medical-tracker-backend
+    networks:
+      - medicalnetwork
+  redis:
+    image: 'redis'
+    hostname: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: always
+    volumes:
+      - redis-data:/data
+    ports:
+      - "127.0.0.1:6380:6379"
+    networks:
+      - medicalnetwork
+  postgres:
+    image: 'postgres'
+    hostname: postgres
+    container_name: postgres
+    restart: always
+    ports:
+      - '127.0.0.1:5434:5432'
+    volumes:
+      - database-data:/var/lib/postgresql/data
+      - ./etc/.s3cfg:/root/.s3cfg
+    environment:
+      POSTGRES_DB: medical
+      POSTGRES_USER: medical
+      POSTGRES_PASSWORD: doNtpvsdS32
+    networks:
+      - medicalnetwork
+  medical-tracker-backend:
+    image: 'ghcr.io/snizinka/medical-tracker-back:latest'
+    hostname: medical-tracker-backend
+    container_name: medical-tracker-backend
+    restart: always
+    tty: true
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: localhost
+      APP_KEY: base64:B1qyVB8jwTegXCb/2rX+zESvPa+jxFR5WCLD4fCett0=
+      CACHE_DRIVER: file
+      SESSION_DRIVER: file
+      QUEUE_DRIVER: sync
+      ROUTES_CACHE: "false"
+      ASSET_CACHE: "false"
+      LINK_POLICY: detect
+      REDIS_HOST: redis\:6379
+      ENABLE_CSRF: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: medical
+      DB_USERNAME: medical
+      DB_PASSWORD: doNtpvsdS32
+    volumes:
+      - ./domains/medical-tracker-backend/src/:/var/www
+    networks:
+      - medicalnetwork
+  medical-tracker-front:
+    image: 'ghcr.io/snizinka/medical-tracker-front:latest'
+    hostname: medical-tracker-front
+    container_name: medical-tracker-front
+    restart: always
+    tty: true
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./domains/medical-tracker-front/src/:/app"
+      - "/app/node_modules"
+    networks:
+      - medicalnetwork
+networks:
+  medicalnetwork:
+    driver: bridge
+volumes:
+  database-data:
+  redis-data:

@@ -1,0 +1,101 @@
+#!/bin/sh
+
+init() {
+    export MEDICAL_TRACKER_BACKEND_PORT=${ARGS[1]:-80}
+}
+
+restart()
+{
+    init
+    docker-compose up -d --force-recreate
+}
+
+stop() {
+    init
+    docker-compose stop
+}
+
+install()
+{
+    init
+    cleanup
+    echo "Cloning git repository..."
+    mkdir domains
+    git clone -b develop git@github.com:snizinka/medical-tracker-back-end.git ./domains/medical-tracker-backend
+    sudo chmod -R 777 ./domains/medical-tracker-backend/src/storage
+
+    COMPOSER_MEMORY_LIMIT=-1 composer install -d ./domains/medical-tracker-backend/src
+
+    git clone -b develop git@github.com:snizinka/medical-tracker-front-end.git ./domains/medical-tracker-front
+
+    restart
+    echo "Running docker container..."
+    docker-compose up -d
+
+    echo "Done"
+}
+
+cleanup()
+{
+    init
+    echo "Cleaning up previous setup..."
+    rm -rf ./domains
+}
+
+function help_menu () {
+cat << EOF
+Usage: ${0}  (-i|-r|-s|-h)
+
+OPTIONS:
+   -h|--help                 Show this message
+   -i|--install              Install Pressure Service locally
+   -r|--restart              Recreate and restart docker containers
+   -s|--stop                 Stop Docker containers
+
+EXAMPLES:
+   Install local environment:
+        $ medical_tracker -i port
+        The default port is 80
+
+   Restart docker containers
+        $ medical_tracker -r port
+        The default port is 80
+
+    Stop docker containers
+        $ medical_tracker -s
+EOF
+}
+
+declare -a ARGS
+for var in "$@"; do
+    if [ "$var" = '-dependency_info' ]; then
+        continue
+    fi
+    ARGS[${#ARGS[@]}]="$var"
+done
+
+while [[ $# > 0 ]]
+do
+case "${1}" in
+    -r|--restart)
+        restart
+        shift
+    ;;
+     -i|--install)
+        install
+        shift
+    ;;
+    -s|--stop)
+        stop
+        exit 0
+    ;;
+     -h|--help)
+        help_menu
+        shift
+    ;;
+    *)
+        echo "${1} is not a valid flag, try running: ${0} --help"
+    ;;
+esac
+shift
+done
